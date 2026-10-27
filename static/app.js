@@ -13,6 +13,9 @@ const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR
 let expenses = [];
 let categoryChart, monthChart;
 
+// GSAP is optional: without the CDN (or with reduced motion) the UI simply appears without animation.
+const motion = typeof gsap !== "undefined" && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json" },
@@ -33,9 +36,19 @@ async function loadExpenses() {
   renderTable();
 }
 
+let shownIds = new Set();
+
 function renderTable() {
-  rowsEl.replaceChildren(...expenses.map(rowFor));
+  const rows = expenses.map(rowFor);
+  rowsEl.replaceChildren(...rows);
   document.getElementById("empty").hidden = expenses.length > 0;
+
+  // Only rows that weren't on screen before fade in, so saving one expense doesn't replay the whole table.
+  if (motion) {
+    const fresh = rows.filter((_, i) => !shownIds.has(expenses[i].id)).slice(0, 25);
+    if (fresh.length) gsap.from(fresh, { opacity: 0, y: 8, duration: 0.35, stagger: 0.03, ease: "power2.out" });
+  }
+  shownIds = new Set(expenses.map((e) => e.id));
 }
 
 function rowFor(expense) {
@@ -54,7 +67,7 @@ function rowFor(expense) {
   actions.className = "actions";
   actions.append(
     button("Edit", "link", () => startEdit(expense)),
-    button("Delete", "link danger", () => deleteExpense(expense)),
+    button("Delete", "link danger", () => deleteExpense(expense, tr)),
   );
   tr.append(actions);
   return tr;
@@ -91,6 +104,11 @@ function startEdit(expense) {
   submitBtn.textContent = "Save";
   cancelBtn.hidden = false;
   form.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (motion) {
+    gsap.fromTo(form.closest(".panel"),
+      { boxShadow: "0 0 0 3px rgba(47, 111, 219, 0.35)" },
+      { boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)", duration: 1.2, delay: 0.3, ease: "power1.out" });
+  }
 }
 
 form.addEventListener("submit", async (event) => {
@@ -111,24 +129,37 @@ form.addEventListener("submit", async (event) => {
     await refresh();
   } catch (err) {
     formError.textContent = err.message;
+    if (motion) gsap.fromTo(formError, { x: -6 }, { x: 0, duration: 0.5, ease: "elastic.out(1, 0.3)" });
   }
 });
 
 cancelBtn.addEventListener("click", resetForm);
 
-async function deleteExpense(expense) {
+async function deleteExpense(expense, row) {
   if (!confirm(`Delete "${expense.description}"?`)) return;
   await api(`/api/expenses/${expense.id}`, { method: "DELETE" });
+  if (motion) await gsap.to(row, { opacity: 0, x: 24, duration: 0.25, ease: "power1.in" });
   await refresh();
 }
 
 // ---------- Dashboard ----------
 
+const counters = new Map(); // stat element -> { value } currently on screen
+
+// Counts a stat card from the value it shows now to the new one.
+function countTo(el, value, format) {
+  if (!motion) { el.textContent = format(value); return; }
+  const state = counters.get(el) || { value: 0 };
+  counters.set(el, state);
+  gsap.killTweensOf(state);
+  gsap.to(state, { value, duration: 0.9, ease: "power2.out", onUpdate: () => { el.textContent = format(state.value); } });
+}
+
 async function loadStats() {
   const stats = await api("/api/stats");
-  document.getElementById("stat-month").textContent = money.format(stats.this_month);
-  document.getElementById("stat-total").textContent = money.format(stats.total);
-  document.getElementById("stat-count").textContent = stats.count;
+  countTo(document.getElementById("stat-month"), stats.this_month, money.format);
+  countTo(document.getElementById("stat-total"), stats.total, money.format);
+  countTo(document.getElementById("stat-count"), stats.count, Math.round);
 
   if (typeof Chart === "undefined") return; // Chart.js CDN not reachable
   categoryChart?.destroy();
@@ -170,6 +201,14 @@ async function refresh() {
   await Promise.all([loadExpenses(), loadStats()]);
 }
 
+function intro() {
+  if (!motion) return;
+  gsap.timeline({ defaults: { ease: "power3.out" } })
+    .from("header h1, .subtitle", { y: 16, opacity: 0, duration: 0.6, stagger: 0.1 })
+    .from(".cards .card, .charts .panel, main > section.panel", { y: 24, opacity: 0, duration: 0.6, stagger: 0.08 }, "-=0.3");
+}
+
 filterEl.addEventListener("change", loadExpenses);
 resetForm();
+intro();
 refresh();
