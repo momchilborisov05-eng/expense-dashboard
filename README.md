@@ -12,9 +12,20 @@ A full-stack web app for tracking personal expenses, with a live dashboard and c
 - **Charts:** spending by category (doughnut) and the last 12 months (bar chart).
 - **Filter** the table by category.
 - **Server-side validation** with clear error messages (amount, date, category, description).
+- **Modern SaaS design** with dark and light themes (theme toggle, remembered in the browser), glass cards and smooth GSAP animations (count-up numbers, row transitions). Works without animations when GSAP is unavailable or reduced motion is on.
 - **Responsive layout** for desktop and phones.
 - **Safe by design:** parameterized SQL queries (no SQL injection) and `textContent` rendering (no XSS).
 - **Automated tests** for the API.
+
+## Screenshots
+
+Light theme:
+
+![Light theme](examples/screenshot-light.png)
+
+Phone layout (390px):
+
+<img src="examples/screenshot-mobile.png" alt="Phone layout" width="300">
 
 ## Tech stack
 

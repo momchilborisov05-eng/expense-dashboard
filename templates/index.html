@@ -4,66 +4,175 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Expense Dashboard</title>
+  <meta name="color-scheme" content="dark light">
+  <script>
+    // Pick the theme before the first paint: ?theme=light|dark, then the saved choice, then the OS setting.
+    (function () {
+      var theme = null;
+      try { var q = new URLSearchParams(location.search).get("theme"); if (q === "light" || q === "dark") theme = q; } catch (e) {}
+      if (!theme) { try { var s = localStorage.getItem("expense-dashboard-theme"); if (s === "light" || s === "dark") theme = s; } catch (e) {} }
+      if (!theme) theme = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
 </head>
 <body>
-  <header>
-    <h1>Expense Dashboard</h1>
-    <p class="subtitle">Track your spending and see where your money goes.</p>
+  <!-- Inline icon sprite (Lucide-style strokes) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+      <symbol id="i-trend" viewBox="0 0 24 24"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></symbol>
+      <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11"/></symbol>
+      <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="bg-glow" aria-hidden="true"><span class="glow glow-a"></span><span class="glow glow-b"></span></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="Expense Dashboard home">
+        <span class="logo-mark"><svg class="icon"><use href="#i-wallet"/></svg></span>
+        <span class="brand-name">Expense Dashboard</span>
+      </a>
+      <div class="topbar-actions">
+        <span class="chip hide-sm">Flask · SQLite · Chart.js</span>
+        <button type="button" id="theme-toggle" class="icon-btn" aria-label="Switch to light theme" title="Toggle theme">
+          <svg class="icon icon-sun"><use href="#i-sun"/></svg>
+          <svg class="icon icon-moon"><use href="#i-moon"/></svg>
+        </button>
+      </div>
+    </div>
   </header>
 
-  <main>
-    <section class="cards">
-      <div class="card"><span class="label">This month</span><span class="value" id="stat-month">–</span></div>
-      <div class="card"><span class="label">Total spent</span><span class="value" id="stat-total">–</span></div>
-      <div class="card"><span class="label">Expenses</span><span class="value" id="stat-count">–</span></div>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <h1>Overview</h1>
+        <p class="subtitle">Track your spending and see where your money goes.</p>
+      </div>
+      <a class="btn btn-primary" href="#expense-form" id="new-expense-link">
+        <svg class="icon"><use href="#i-plus"/></svg> New expense
+      </a>
+    </section>
+
+    <section class="kpis" aria-label="Summary">
+      <article class="card kpi is-loading">
+        <div class="kpi-head"><span class="kpi-label">This month</span><span class="kpi-icon"><svg class="icon"><use href="#i-calendar"/></svg></span></div>
+        <span class="kpi-value" id="stat-month">–</span>
+        <span class="kpi-sub" id="stat-month-sub">&nbsp;</span>
+      </article>
+      <article class="card kpi is-loading">
+        <div class="kpi-head"><span class="kpi-label">Total spent</span><span class="kpi-icon"><svg class="icon"><use href="#i-trend"/></svg></span></div>
+        <span class="kpi-value" id="stat-total">–</span>
+        <div class="kpi-foot">
+          <span class="kpi-sub" id="stat-total-sub">&nbsp;</span>
+          <svg class="sparkline" id="sparkline" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+      </article>
+      <article class="card kpi is-loading">
+        <div class="kpi-head"><span class="kpi-label">Expenses</span><span class="kpi-icon"><svg class="icon"><use href="#i-receipt"/></svg></span></div>
+        <span class="kpi-value" id="stat-count">–</span>
+        <span class="kpi-sub" id="stat-count-sub">&nbsp;</span>
+      </article>
+      <article class="card kpi is-loading">
+        <div class="kpi-head"><span class="kpi-label">Top category</span><span class="kpi-icon"><svg class="icon"><use href="#i-tag"/></svg></span></div>
+        <span class="kpi-value kpi-value-text" id="stat-top">–</span>
+        <span class="kpi-sub" id="stat-top-sub">&nbsp;</span>
+      </article>
     </section>
 
     <section class="charts">
-      <div class="panel">
-        <h2>By category</h2>
-        <div class="chart-box"><canvas id="category-chart"></canvas></div>
-      </div>
-      <div class="panel">
-        <h2>Last 12 months</h2>
-        <div class="chart-box"><canvas id="month-chart"></canvas></div>
-      </div>
+      <article class="card panel">
+        <div class="panel-head">
+          <div><h2>By category</h2><p class="panel-sub">Share of all spending</p></div>
+        </div>
+        <div class="chart-box is-loading" data-chart="category"><canvas id="category-chart" aria-label="Spending by category chart" role="img"></canvas></div>
+      </article>
+      <article class="card panel">
+        <div class="panel-head">
+          <div><h2>Last 12 months</h2><p class="panel-sub">Monthly spending</p></div>
+        </div>
+        <div class="chart-box is-loading" data-chart="month"><canvas id="month-chart" aria-label="Monthly spending chart" role="img"></canvas></div>
+      </article>
     </section>
 
-    <section class="panel">
-      <h2 id="form-title">Add expense</h2>
-      <form id="expense-form">
+    <section class="card panel form-panel" id="form-panel">
+      <div class="panel-head">
+        <div><h2 id="form-title">Add expense</h2><p class="panel-sub">Saved instantly to the SQLite database.</p></div>
+      </div>
+      <form id="expense-form" novalidate>
         <input type="hidden" name="expense_id">
-        <input name="description" placeholder="Description" required maxlength="200">
-        <input name="amount" type="number" step="0.01" min="0.01" placeholder="Amount" required>
-        <select name="category">
-          {% for c in categories %}<option>{{ c }}</option>{% endfor %}
-        </select>
-        <input name="spent_on" type="date" required>
-        <button type="submit" id="submit-btn">Add</button>
-        <button type="button" id="cancel-btn" class="secondary" hidden>Cancel</button>
+        <label class="field field-desc">
+          <span class="field-label">Description</span>
+          <input name="description" placeholder="e.g. Groceries" required maxlength="200" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="field-label">Amount (EUR)</span>
+          <input name="amount" type="number" step="0.01" min="0.01" placeholder="0.00" required inputmode="decimal">
+        </label>
+        <label class="field">
+          <span class="field-label">Category</span>
+          <select name="category">
+            {% for c in categories %}<option>{{ c }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Date</span>
+          <input name="spent_on" type="date" required>
+        </label>
+        <div class="form-actions">
+          <button type="submit" id="submit-btn" class="btn btn-primary">Add</button>
+          <button type="button" id="cancel-btn" class="btn btn-secondary" hidden>Cancel</button>
+        </div>
       </form>
       <p id="form-error" class="error" role="alert"></p>
     </section>
 
-    <section class="panel">
-      <div class="table-header">
-        <h2>Recent expenses</h2>
-        <select id="filter">
-          <option value="">All categories</option>
-          {% for c in categories %}<option>{{ c }}</option>{% endfor %}
-        </select>
+    <section class="card panel table-panel">
+      <div class="panel-head">
+        <div><h2>Recent expenses</h2><p class="panel-sub"><span id="row-count">Loading…</span></p></div>
+        <label class="select-wrap">
+          <span class="sr-only">Filter by category</span>
+          <select id="filter">
+            <option value="">All categories</option>
+            {% for c in categories %}<option>{{ c }}</option>{% endfor %}
+          </select>
+        </label>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="num">Amount</th><th></th></tr></thead>
-          <tbody id="expense-rows"></tbody>
+          <thead><tr><th class="col-date">Date</th><th>Description</th><th class="col-cat">Category</th><th class="num">Amount</th><th class="actions"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody id="expense-rows">
+            <tr class="skeleton-row"><td colspan="5"><span class="skeleton"></span></td></tr>
+            <tr class="skeleton-row"><td colspan="5"><span class="skeleton"></span></td></tr>
+            <tr class="skeleton-row"><td colspan="5"><span class="skeleton"></span></td></tr>
+            <tr class="skeleton-row"><td colspan="5"><span class="skeleton"></span></td></tr>
+          </tbody>
         </table>
       </div>
-      <p id="empty" class="muted" hidden>No expenses yet. Add your first one above.</p>
+      <div id="empty" class="empty" hidden>
+        <span class="empty-icon"><svg class="icon"><use href="#i-inbox"/></svg></span>
+        <strong>No expenses yet</strong>
+        <span class="muted">Add your first one above and the dashboard fills in.</span>
+      </div>
     </section>
+
+    <footer class="footer">Built with Python, Flask, SQLite and vanilla JavaScript.</footer>
   </main>
 
   <script src="{{ url_for('static', filename='app.js') }}"></script>
